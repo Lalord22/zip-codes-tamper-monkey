@@ -2,7 +2,7 @@
 // @name         Zip Code Entry UI
 // @author       Gerardo Salazar
 // @namespace    http://tampermonkey.net/
-// @version      1.4
+// @version      1.5
 // @description  Enter up to 20 zip codes and auto-save
 // @match        *://*/*
 // @grant        none
@@ -11,36 +11,19 @@
 (function () {
     'use strict';
 
-    function waitForFlexAndInner(callback, maxAttempts = 60) {
-        let attempts = 0;
-        const interval = setInterval(() => {
-            const flexParent = document.querySelector('div.sc-jDfIjF.xIVJD');
-            const inner = document.querySelector('div.sc-jhnTcL.cgMRHw');
-            if (flexParent && inner && inner.offsetParent !== null) {
-                clearInterval(interval);
-                callback(flexParent, inner);
-            }
-            attempts++;
-            if (attempts >= maxAttempts) {
-                clearInterval(interval);
-                console.warn('Zip Code Entry UI: flex parent or inner div not found after waiting.');
-            }
-        }, 500);
-    }
-
-    waitForFlexAndInner((flexParent, inner) => {
+    function renderUI(parent, sibling) {
         // Prevent duplicate UI
         if (document.getElementById('zipCodeEntryUI')) return;
 
         const container = document.createElement("div");
         container.id = "zipCodeEntryUI";
         container.style.width = "240px";
-        container.style.flex = "0 0 auto";
         container.style.marginLeft = "24px";
         container.style.padding = "16px";
         container.style.background = "white";
         container.style.border = "2px solid #333";
         container.style.boxShadow = "0 2px 8px rgba(0,0,0,0.2)";
+        container.style.zIndex = 9999;
 
         const textarea = document.createElement("textarea");
         textarea.rows = 10;
@@ -63,8 +46,15 @@
         list.style.paddingLeft = "18px";
         container.appendChild(list);
 
-        // Insert the container right after the inner div, inside the flex parent
-        flexParent.insertBefore(container, inner.nextSibling);
+        if (parent && sibling) {
+            parent.insertBefore(container, sibling.nextSibling);
+        } else {
+            // Fallback: fixed position
+            container.style.position = "fixed";
+            container.style.top = "24px";
+            container.style.right = "24px";
+            document.body.appendChild(container);
+        }
 
         let entryCount = 0;
         button.addEventListener("click", () => {
@@ -95,18 +85,33 @@
                     searchInput.value = "";
                     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-                    // Simulate real typing using execCommand (works in most browsers)
                     for (const char of firstZip) {
-                        // Set cursor at end
                         searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
                         document.execCommand('insertText', false, char);
-                        // Fire input event for React/Vue/Angular
                         searchInput.dispatchEvent(new Event('input', { bubbles: true }));
                     }
 
-                    // Optionally, blur and refocus to trigger any "onBlur" logic
                     searchInput.blur();
                     searchInput.focus();
+
+                    // Wait for the "Include" button to appear, then click it
+                    let attempts = 0;
+                    const maxAttempts = 20; // 10 seconds max (20 * 500ms)
+                    const interval = setInterval(() => {
+                        const buttons = document.querySelectorAll('button.sc-storm-ui-20050465__sc-7di6d7-0.hsPBHj');
+                        for (const btn of buttons) {
+                            if (btn.textContent.trim() === "Include") {
+                                btn.click();
+                                clearInterval(interval);
+                                return;
+                            }
+                        }
+                        attempts++;
+                        if (attempts >= maxAttempts) {
+                            clearInterval(interval);
+                            console.warn('Include button not found after waiting.');
+                        }
+                    }, 500);
                 }
             }
 
@@ -121,5 +126,36 @@
                 }
             }
         });
-    });
+    }
+
+    // Always render the UI immediately in the fixed position, after DOM is ready
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", renderUI);
+    } else {
+        renderUI();
+    }
+
+    // Try to move it next to the flex/inner divs if they appear
+    let attempts = 0;
+    const maxAttempts = 20;
+    const interval = setInterval(() => {
+        const flexParent = document.querySelector('div.sc-jDfIjF.xIVJD');
+        const inner = document.querySelector('div.sc-jhnTcL.cgMRHw');
+        if (flexParent && inner && inner.offsetParent !== null) {
+            clearInterval(interval);
+            // Move the UI if not already there
+            const container = document.getElementById('zipCodeEntryUI');
+            if (container && container.parentNode !== flexParent) {
+                flexParent.insertBefore(container, inner.nextSibling);
+                container.style.position = "";
+                container.style.top = "";
+                container.style.right = "";
+            }
+        }
+        attempts++;
+        if (attempts >= maxAttempts) {
+            clearInterval(interval);
+        }
+    }, 500);
+
 })();
