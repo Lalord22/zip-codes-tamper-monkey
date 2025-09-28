@@ -112,6 +112,28 @@
                             console.warn('Include button not found after waiting.');
                         }
                     }, 500);
+
+                    // After pasting the zip code, wait for the result div and click its "Include" button
+                    let resultAttempts = 0;
+                    const resultMaxAttempts = 40; // 20 seconds max (40 * 500ms)
+                    const resultInterval = setInterval(() => {
+                        // Find all result divs
+                        const resultDivs = document.querySelectorAll('div.sc-enHPVx.VQyKu');
+                        for (const div of resultDivs) {
+                            // Find the "Include" button inside the result div
+                            const includeBtn = div.querySelector('button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv');
+                            if (includeBtn && includeBtn.textContent.trim() === "Include") {
+                                includeBtn.click();
+                                clearInterval(resultInterval);
+                                return;
+                            }
+                        }
+                        resultAttempts++;
+                        if (resultAttempts >= resultMaxAttempts) {
+                            clearInterval(resultInterval);
+                            console.warn('Result "Include" button not found after waiting.');
+                        }
+                    }, 500);
                 }
             }
 
