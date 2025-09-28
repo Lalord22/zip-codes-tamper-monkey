@@ -113,25 +113,42 @@
                         }
                     }, 500);
 
-                    // After pasting the zip code, wait for the result div and click its "Include" button
+                    // After pasting the zip code, wait for the result div or "no results" message
                     let resultAttempts = 0;
                     const resultMaxAttempts = 40; // 20 seconds max (40 * 500ms)
                     const resultInterval = setInterval(() => {
-                        // Find all result divs
+                        // Get the selected country
+                        const countryP = document.getElementById("country_0");
+                        const selectedCountry = countryP ? countryP.textContent.trim() : null;
+
+                        // Check for result divs
                         const resultDivs = document.querySelectorAll('div.sc-enHPVx.VQyKu');
                         for (const div of resultDivs) {
-                            // Find the "Include" button inside the result div
-                            const includeBtn = div.querySelector('button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv');
-                            if (includeBtn && includeBtn.textContent.trim() === "Include") {
-                                includeBtn.click();
-                                clearInterval(resultInterval);
-                                return;
+                            // Find the country in the result div (first <p>)
+                            const countryInDiv = div.querySelector('p');
+                            const countryText = countryInDiv ? countryInDiv.textContent.split('>')[0].trim() : null;
+
+                            // Only click "Include" if country matches
+                            if (countryText === selectedCountry) {
+                                const includeBtn = div.querySelector('button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv');
+                                if (includeBtn && includeBtn.textContent.trim() === "Include") {
+                                    includeBtn.click();
+                                    clearInterval(resultInterval);
+                                    return;
+                                }
                             }
+                        }
+                        // Check for "no results" message
+                        const noResultsDiv = document.querySelector('div.sc-bwsPYA.fbukVa');
+                        if (noResultsDiv) {
+                            clearInterval(resultInterval);
+                            alert("No results found for this zip code.");
+                            return;
                         }
                         resultAttempts++;
                         if (resultAttempts >= resultMaxAttempts) {
                             clearInterval(resultInterval);
-                            console.warn('Result "Include" button not found after waiting.');
+                            console.warn('Result "Include" button or "no results" message not found after waiting.');
                         }
                     }, 500);
                 }
