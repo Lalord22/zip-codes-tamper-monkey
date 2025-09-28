@@ -128,34 +128,34 @@
         });
     }
 
-    // Always render the UI immediately in the fixed position, after DOM is ready
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", renderUI);
-    } else {
-        renderUI();
+    // Wait for the "Change" button, then start looking for flexParent and inner
+    function waitForChangeButton() {
+        const changeBtn = document.getElementById("geoTargetingChangeButton_0");
+        if (changeBtn) {
+            changeBtn.addEventListener("click", () => {
+                // Start looking for flexParent and inner after "Change" is clicked
+                let attempts = 0;
+                const maxAttempts = 40; // 20 seconds max (40 * 500ms)
+                const interval = setInterval(() => {
+                    const flexParent = document.querySelector('div.sc-jDfIjF.xIVJD');
+                    const inner = document.querySelector('div.sc-jhnTcL.cgMRHw');
+                    if (flexParent && inner && inner.offsetParent !== null) {
+                        clearInterval(interval);
+                        renderUI(flexParent, inner);
+                    }
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        clearInterval(interval);
+                        console.warn('Could not find flexParent and inner div for Zip Code Entry UI.');
+                    }
+                }, 500);
+            });
+        } else {
+            // Try again in 500ms if button not found yet
+            setTimeout(waitForChangeButton, 500);
+        }
     }
 
-    // Try to move it next to the flex/inner divs if they appear
-    let attempts = 0;
-    const maxAttempts = 20;
-    const interval = setInterval(() => {
-        const flexParent = document.querySelector('div.sc-jDfIjF.xIVJD');
-        const inner = document.querySelector('div.sc-jhnTcL.cgMRHw');
-        if (flexParent && inner && inner.offsetParent !== null) {
-            clearInterval(interval);
-            // Move the UI if not already there
-            const container = document.getElementById('zipCodeEntryUI');
-            if (container && container.parentNode !== flexParent) {
-                flexParent.insertBefore(container, inner.nextSibling);
-                container.style.position = "";
-                container.style.top = "";
-                container.style.right = "";
-            }
-        }
-        attempts++;
-        if (attempts >= maxAttempts) {
-            clearInterval(interval);
-        }
-    }, 500);
+    waitForChangeButton();
 
 })();
