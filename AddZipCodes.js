@@ -65,27 +65,39 @@
 
             if (lines.length === 0) return;
 
-            let firstZip = null;
-            for (const code of lines) {
-                if (entryCount >= 20) break;
+            textarea.value = "";
+            list.innerHTML = "";
+            entryCount = 0;
+
+            // Helper to process one zip code at a time
+            function processZip(index) {
+                if (index >= lines.length || entryCount >= 20) {
+                    // Optionally save draft after 20 entries
+                    if (entryCount >= 20) {
+                        const saveBtn = document.getElementById("saveDraftBtn");
+                        if (saveBtn) {
+                            saveBtn.click();
+                            entryCount = 0;
+                            alert("20 entries added. Draft saved.");
+                        }
+                    }
+                    return;
+                }
+
+                const code = lines[index];
                 const li = document.createElement("li");
                 li.textContent = code;
                 list.appendChild(li);
                 entryCount++;
-                if (firstZip === null) firstZip = code;
-            }
 
-            textarea.value = "";
-
-            // Paste the first zip code into the search input
-            if (firstZip) {
+                // Paste zip code into search input
                 const searchInput = document.getElementById("geoTargetingSearchInputId");
                 if (searchInput) {
                     searchInput.focus();
                     searchInput.value = "";
                     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-                    for (const char of firstZip) {
+                    for (const char of code) {
                         searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
                         document.execCommand('insertText', false, char);
                         searchInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -94,76 +106,51 @@
                     searchInput.blur();
                     searchInput.focus();
 
-                    // Wait for the "Include" button to appear, then click it
-                    let attempts = 0;
-                    const maxAttempts = 20; // 10 seconds max (20 * 500ms)
-                    const interval = setInterval(() => {
-                        const buttons = document.querySelectorAll('button.sc-storm-ui-20050465__sc-7di6d7-0.hsPBHj');
-                        for (const btn of buttons) {
-                            if (btn.textContent.trim() === "Include") {
-                                btn.click();
-                                clearInterval(interval);
-                                return;
-                            }
-                        }
-                        attempts++;
-                        if (attempts >= maxAttempts) {
-                            clearInterval(interval);
-                            console.warn('Include button not found after waiting.');
-                        }
-                    }, 500);
-
-                    // After pasting the zip code, wait for the result div or "no results" message
+                    // Wait for result and include
                     let resultAttempts = 0;
-                    const resultMaxAttempts = 40; // 20 seconds max (40 * 500ms)
+                    const resultMaxAttempts = 40;
                     const resultInterval = setInterval(() => {
-                        // Get the selected country
                         const countryP = document.getElementById("country_0");
                         const selectedCountry = countryP ? countryP.textContent.trim() : null;
 
-                        // Check for result divs
                         const resultDivs = document.querySelectorAll('div.sc-enHPVx.VQyKu');
+                        let included = false;
                         for (const div of resultDivs) {
-                            // Find the country in the result div (first <p>)
                             const countryInDiv = div.querySelector('p');
                             const countryText = countryInDiv ? countryInDiv.textContent.split('>')[0].trim() : null;
-
-                            // Only click "Include" if country matches
                             if (countryText === selectedCountry) {
                                 const includeBtn = div.querySelector('button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv');
                                 if (includeBtn && includeBtn.textContent.trim() === "Include") {
                                     includeBtn.click();
-                                    clearInterval(resultInterval);
-                                    return;
+                                    included = true;
+                                    break;
                                 }
                             }
+                        }
+                        if (included) {
+                            clearInterval(resultInterval);
+                            setTimeout(() => processZip(index + 1), 1000); // Wait a bit before next
+                            return;
                         }
                         // Check for "no results" message
                         const noResultsDiv = document.querySelector('div.sc-bwsPYA.fbukVa');
                         if (noResultsDiv) {
                             clearInterval(resultInterval);
-                            alert("No results found for this zip code.");
+                            
+                            setTimeout(() => processZip(index + 1), 1000);
                             return;
                         }
                         resultAttempts++;
                         if (resultAttempts >= resultMaxAttempts) {
                             clearInterval(resultInterval);
                             console.warn('Result "Include" button or "no results" message not found after waiting.');
+                            setTimeout(() => processZip(index + 1), 1000);
                         }
                     }, 500);
                 }
             }
 
-            // Click Save Draft if 20 entries added
-            if (entryCount >= 20) {
-                const saveBtn = document.getElementById("saveDraftBtn");
-                if (saveBtn) {
-                    saveBtn.click();
-                    entryCount = 0;
-                    alert("20 entries added. Draft saved.");
-                    list.innerHTML = "";
-                }
-            }
+            processZip(0);
         });
     }
 
