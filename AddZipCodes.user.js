@@ -3,7 +3,7 @@
 // @author       Gerardo Salazar
 // @namespace    http://tampermonkey.net/
 // @version      1.5
-// @description  Enter up to 20 zip codes and auto-save
+// @description  Enter up to 20 zip codes 
 // @match        *://*/*
 // @grant        none
 // ==/UserScript==
@@ -49,7 +49,7 @@
         if (parent && sibling) {
             parent.insertBefore(container, sibling.nextSibling);
         } else {
-            // Fallback: fixed position
+            
             container.style.position = "fixed";
             container.style.top = "24px";
             container.style.right = "24px";
@@ -85,10 +85,7 @@
                 }
 
                 const code = lines[index];
-                const li = document.createElement("li");
-                li.textContent = code;
-                list.appendChild(li);
-                entryCount++;
+                
 
                 // Paste zip code into search input
                 const searchInput = document.getElementById("geoTargetingSearchInputId");
@@ -123,6 +120,7 @@
                                 if (includeBtn && includeBtn.textContent.trim() === "Include") {
                                     includeBtn.click();
                                     included = true;
+                                    entryCount++;
                                     break;
                                 }
                             }
@@ -136,7 +134,12 @@
                         const noResultsDiv = document.querySelector('div.sc-bwsPYA.fbukVa');
                         if (noResultsDiv) {
                             clearInterval(resultInterval);
-                            
+
+                            // Add code to the list of not found codes
+                            const li = document.createElement("li");
+                            li.textContent = code;
+                            list.appendChild(li);
+
                             setTimeout(() => processZip(index + 1), 1000);
                             return;
                         }
