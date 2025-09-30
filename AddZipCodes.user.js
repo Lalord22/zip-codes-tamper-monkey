@@ -45,6 +45,23 @@
         list.style.marginTop = "12px";
         list.style.paddingLeft = "18px";
         container.appendChild(list);
+        list.style.maxHeight = "100px";
+        list.style.overflowY = "auto";
+        list.style.border = "1px solid #ccc";
+        list.style.padding = "8px";
+        list.style.background = "#f9f9f9";
+        
+        //title to the list
+        const title = document.createElement("div");
+        title.textContent = "Codes not found:";
+        title.style.fontWeight = "bold";
+        title.style.marginBottom = "4px";
+        title.style.marginTop = "12px"; 
+        container.insertBefore(title, list);
+
+         // Insert the container into the DOM
+
+
 
         if (parent && sibling) {
             parent.insertBefore(container, sibling.nextSibling);
