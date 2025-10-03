@@ -2,7 +2,7 @@
 // @name         Zip Code Entry UI
 // @author       Gerardo Salazar
 // @namespace    http://tampermonkey.net/
-// @version      1.5
+// @version      1.7
 // @description  Enter up to 20 zip codes 
 // @match        *://*/*
 // @grant        none
@@ -51,7 +51,6 @@
         list.style.padding = "8px";
         list.style.background = "#f9f9f9";
         
-        //title to the list
         const title = document.createElement("div");
         title.textContent = "Codes not found:";
         title.style.fontWeight = "bold";
@@ -59,9 +58,7 @@
         title.style.marginTop = "12px"; 
         container.insertBefore(title, list);
 
-         // Insert the container into the DOM
-
-
+         
 
         if (parent && sibling) {
             parent.insertBefore(container, sibling.nextSibling);
@@ -89,7 +86,7 @@
             // Helper to process one zip code at a time
             function processZip(index) {
                 if (index >= lines.length || entryCount >= 20) {
-                    // Optionally save draft after 20 entries
+                   
                     if (entryCount >= 20) {
                         const saveBtn = document.getElementById("saveDraftBtn");
                         if (saveBtn) {
@@ -131,8 +128,14 @@
                         let included = false;
                         for (const div of resultDivs) {
                             const countryInDiv = div.querySelector('p');
-                            const countryText = countryInDiv ? countryInDiv.textContent.split('>')[0].trim() : null;
-                            if (countryText === selectedCountry) {
+                            const locationText = countryInDiv ? countryInDiv.textContent : "";
+                            const countryText = locationText.split('>')[0].trim();
+
+                            // Check both country and zip code match
+                            if (
+                                countryText === selectedCountry &&
+                                locationText.endsWith('>' + code)
+                            ) {
                                 const includeBtn = div.querySelector('button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv');
                                 if (includeBtn && includeBtn.textContent.trim() === "Include") {
                                     includeBtn.click();
@@ -142,14 +145,16 @@
                                 }
                             }
                         }
+
                         if (included) {
                             clearInterval(resultInterval);
-                            setTimeout(() => processZip(index + 1), 1000); // Wait a bit before next
+                            setTimeout(() => processZip(index + 1), 1000);
                             return;
                         }
-                        // Check for "no results" message
+
+                        // If there are results but none matched, or if "no results" message is present
                         const noResultsDiv = document.querySelector('div.sc-bwsPYA.fbukVa');
-                        if (noResultsDiv) {
+                        if ((resultDivs.length > 0 && !included) || noResultsDiv) {
                             clearInterval(resultInterval);
 
                             // Add code to the list of not found codes
@@ -160,10 +165,17 @@
                             setTimeout(() => processZip(index + 1), 1000);
                             return;
                         }
+
                         resultAttempts++;
                         if (resultAttempts >= resultMaxAttempts) {
                             clearInterval(resultInterval);
                             console.warn('Result "Include" button or "no results" message not found after waiting.');
+
+                            // Add code to the list of not found codes (timeout case)
+                            const li = document.createElement("li");
+                            li.textContent = code;
+                            list.appendChild(li);
+
                             setTimeout(() => processZip(index + 1), 1000);
                         }
                     }, 500);
