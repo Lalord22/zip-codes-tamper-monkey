@@ -136,12 +136,19 @@
                                 countryText === selectedCountry &&
                                 locationText.endsWith('>' + code)
                             ) {
-                                const includeBtn = div.querySelector('button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv');
-                                if (includeBtn && includeBtn.textContent.trim() === "Include") {
-                                    includeBtn.click();
-                                    included = true;
-                                    entryCount++;
-                                    break;
+                                const actionBtn = div.querySelector('button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv');
+                                if (actionBtn) {
+                                    const btnText = actionBtn.textContent.trim();
+                                    if (btnText === "Include") {
+                                        actionBtn.click();
+                                        included = true;
+                                        entryCount++;
+                                        break;
+                                    } else if (btnText === "Exclude") {
+                                        actionBtn.click();
+                                        included = true; 
+                                        break;
+                                    }
                                 }
                             }
                         }
