@@ -2,7 +2,7 @@
 // @name         Zip Code Entry UI
 // @author       Gerardo Salazar
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      2.5
 // @description  Enter up to 20 zip codes 
 // @match        *://*/*
 // @grant        none
@@ -122,19 +122,25 @@
                     const resultMaxAttempts = 40;
                     const resultInterval = setInterval(() => {
                         const countryP = document.getElementById("country_0");
-                        const selectedCountry = countryP ? countryP.textContent.trim() : null;
+                        let selectedCountry = countryP ? countryP.textContent.trim() : null;
+
+                        // List of country exceptions
+                        if (selectedCountry === "UK") {
+                            selectedCountry = "GB";
+                        }
 
                         const resultDivs = document.querySelectorAll('div.sc-enHPVx.VQyKu');
                         let included = false;
                         for (const div of resultDivs) {
                             const countryInDiv = div.querySelector('p');
-                            const locationText = countryInDiv ? countryInDiv.textContent : "";
+                            const locationText = countryInDiv ? countryInDiv.textContent.trim() : "";
                             const countryText = locationText.split('>')[0].trim();
+                            const locationParts = locationText.split('>');
+                            const zipInLocation = locationParts[locationParts.length - 1].trim();
 
-                            // Check both country and zip code match
                             if (
                                 countryText === selectedCountry &&
-                                locationText.endsWith('>' + code)
+                                zipInLocation === code.trim()
                             ) {
                                 const actionBtn = div.querySelector('button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv');
                                 if (actionBtn) {
