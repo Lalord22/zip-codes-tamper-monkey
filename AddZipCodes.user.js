@@ -2,7 +2,7 @@
 // @name         Zip Code Entry UI
 // @author       Gerardo Salazar
 // @namespace    http://tampermonkey.net/
-// @version      2.6
+// @version      2.8
 // @description  Enter up to 20 zip codes 
 // @match        *://*/*
 // @grant        none
@@ -138,8 +138,16 @@
                             const locationParts = locationText.split('>');
                             const zipInLocation = locationParts[locationParts.length - 1].trim();
 
+                            // Country match logic
+                            let countryMatch = false;
+                            if (selectedCountry === "DE") {
+                                countryMatch = (countryText === "DE" || countryText === "AT");
+                            } else {
+                                countryMatch = (countryText === selectedCountry);
+                            }
+
                             if (
-                                countryText === selectedCountry &&
+                                countryMatch &&
                                 zipInLocation === code.trim()
                             ) {
                                 const actionBtn = div.querySelector(
