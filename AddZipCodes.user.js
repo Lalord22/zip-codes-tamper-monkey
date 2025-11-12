@@ -2,7 +2,7 @@
 // @name         Zip Code Entry UI
 // @author       Gerardo Salazar
 // @namespace    http://tampermonkey.net/
-// @version      2.8
+// @version      2.6
 // @description  Enter up to 20 zip codes 
 // @match        *://*/*
 // @grant        none
@@ -131,6 +131,7 @@
 
                         const resultDivs = document.querySelectorAll('div.sc-enHPVx.VQyKu');
                         let included = false;
+                        let foundDisabled = false;
                         for (const div of resultDivs) {
                             const countryInDiv = div.querySelector('p');
                             const locationText = countryInDiv ? countryInDiv.textContent.trim() : "";
@@ -138,22 +139,18 @@
                             const locationParts = locationText.split('>');
                             const zipInLocation = locationParts[locationParts.length - 1].trim();
 
-                            // Country match logic
-                            let countryMatch = false;
-                            if (selectedCountry === "DE") {
-                                countryMatch = (countryText === "DE" || countryText === "AT");
-                            } else {
-                                countryMatch = (countryText === selectedCountry);
-                            }
-
                             if (
-                                countryMatch &&
+                                countryText === selectedCountry &&
                                 zipInLocation === code.trim()
                             ) {
                                 const actionBtn = div.querySelector(
-                                    'button.sc-storm-ui-20054379__sc-7di6d7-0.euxRVh, button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv'
+                                    'button.sc-storm-ui-20054995__sc-7di6d7-0.zUNWB, button.sc-storm-ui-20054379__sc-7di6d7-0.euxRVh, button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv'
                                 );
                                 if (actionBtn) {
+                                    if (actionBtn.disabled) {
+                                        foundDisabled = true;
+                                        break; 
+                                    }
                                     const btnText = actionBtn.textContent.trim();
                                     if (btnText === "Include") {
                                         actionBtn.click();
@@ -169,15 +166,15 @@
                             }
                         }
 
-                        if (included) {
+                        if (included || foundDisabled) {
                             clearInterval(resultInterval);
                             setTimeout(() => processZip(index + 1), 1000);
                             return;
                         }
 
-                        // If there are results but none matched, or if "no results" message is present
+                       
                         const noResultsDiv = document.querySelector('div.sc-bwsPYA.fbukVa');
-                        if ((resultDivs.length > 0 && !included) || noResultsDiv) {
+                        if ((resultDivs.length > 0 && !included && !foundDisabled) || noResultsDiv) {
                             clearInterval(resultInterval);
 
                             // Add code to the list of not found codes
