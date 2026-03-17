@@ -2,8 +2,8 @@
 // @name         Zip Code Entry UI
 // @author       Gerardo Salazar
 // @namespace    http://tampermonkey.net/
-// @version      2.6
-// @description  Enter up to 20 zip codes 
+// @version      3.13.26
+// @description  Enter up to 100 zip codes
 // @match        *://*/*
 // @grant        none
 // ==/UserScript==
@@ -30,7 +30,7 @@
         textarea.cols = 20;
         textarea.style.width = "100%";
         textarea.style.boxSizing = "border-box";
-        textarea.placeholder = "Paste up to 20 zip codes,\none per line";
+        textarea.placeholder = "Paste up to 100 zip codes,\none per line";
         textarea.style.display = "block";
         textarea.style.marginBottom = "8px";
         container.appendChild(textarea);
@@ -50,20 +50,20 @@
         list.style.border = "1px solid #ccc";
         list.style.padding = "8px";
         list.style.background = "#f9f9f9";
-        
+
         const title = document.createElement("div");
         title.textContent = "Codes not found:";
         title.style.fontWeight = "bold";
         title.style.marginBottom = "4px";
-        title.style.marginTop = "12px"; 
+        title.style.marginTop = "12px";
         container.insertBefore(title, list);
 
-         
+
 
         if (parent && sibling) {
             parent.insertBefore(container, sibling.nextSibling);
         } else {
-            
+
             container.style.position = "fixed";
             container.style.top = "24px";
             container.style.right = "24px";
@@ -85,21 +85,21 @@
 
             // Helper to process one zip code at a time
             function processZip(index) {
-                if (index >= lines.length || entryCount >= 20) {
-                   
-                    if (entryCount >= 20) {
+                if (index >= lines.length || entryCount >= 100) {
+
+                    if (entryCount >= 100) {
                         const saveBtn = document.getElementById("saveDraftBtn");
                         if (saveBtn) {
                             saveBtn.click();
                             entryCount = 0;
-                            alert("20 entries added. Draft saved.");
+                            alert("100 entries added. Draft saved.");
                         }
                     }
                     return;
                 }
 
                 const code = lines[index];
-                
+
 
                 // Paste zip code into search input
                 const searchInput = document.getElementById("geoTargetingSearchInputId");
@@ -144,7 +144,8 @@
                                 zipInLocation === code.trim()
                             ) {
                                 const actionBtn = div.querySelector(
-                                    'button.sc-storm-ui-20054995__sc-7di6d7-0.zUNWB, button.sc-storm-ui-20054379__sc-7di6d7-0.euxRVh, button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv'
+                                    `button.sc-storm-ui-20054995__sc-7di6d7-0.zUNWB, button.sc-storm-ui-20054379__sc-7di6d7-0.euxRVh, button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv, button.sc-storm-ui-20057493__sc-7di6d7-0.jyaCfF,
+                                    button.sc-storm-ui-20058857__sc-7di6d7-0.jwjqAG, button.sc-storm-ui-20059048__sc-7di6d7-0.bAhUeF, button.sc-storm-ui-20059331__sc-7di6d7-0.wmAmY`
                                 );
                                 if (actionBtn) {
                                     if (actionBtn.disabled) {
@@ -159,7 +160,7 @@
                                         break;
                                     } else if (btnText === "Exclude") {
                                         actionBtn.click();
-                                        included = true; 
+                                        included = true;
                                         break;
                                     }
                                 }
@@ -172,7 +173,7 @@
                             return;
                         }
 
-                       
+                        // If there are results but none matched, or if "no results" message is present
                         const noResultsDiv = document.querySelector('div.sc-bwsPYA.fbukVa');
                         if ((resultDivs.length > 0 && !included && !foundDisabled) || noResultsDiv) {
                             clearInterval(resultInterval);
