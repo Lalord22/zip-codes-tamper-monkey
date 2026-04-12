@@ -10,7 +10,9 @@
 // @match        https://advertising.amazon.uk/dsp/*/oms/app/inventory/*/settings*
 // @match        https://advertising.amazon.jp/dsp/*/oms/app/campaign/*/inventories/edit*
 // @match        https://advertising.amazon.jp/dsp/*/oms/app/inventory/*/settings*
-// @grant        none
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_registerMenuCommand
 // ==/UserScript==
 
 (function () {
@@ -18,6 +20,7 @@
 
     let isRenderPaused = false;
     let detachAnchorTracking = null;
+    const MAP_STORAGE_KEY = 'audience-map-json-v1';
 
     // Audience code → exact audience path text to match in results
     const AUDIENCE_MAP = {
@@ -26,6 +29,137 @@
         // Add more mappings here:
         // "CODE": "Category > Subcategory > Audience Name",
     };
+    let importedAudienceMap = null;
+
+    function normalizeAudienceMap(rawMap) {
+        if (!rawMap || typeof rawMap !== 'object' || Array.isArray(rawMap)) {
+            return null;
+        }
+
+        const normalized = {};
+        for (const [key, value] of Object.entries(rawMap)) {
+            const code = String(key || '').trim();
+            const path = String(value || '').trim();
+            if (code && path) {
+                normalized[code] = path;
+            }
+        }
+
+        return Object.keys(normalized).length > 0 ? normalized : null;
+    }
+
+    function getActiveAudienceMap() {
+        return importedAudienceMap || AUDIENCE_MAP;
+    }
+
+    function loadStoredAudienceMap() {
+        if (typeof GM_getValue !== 'function') {
+            return;
+        }
+
+        try {
+            const stored = GM_getValue(MAP_STORAGE_KEY, '');
+            if (!stored) {
+                return;
+            }
+
+            const parsed = JSON.parse(stored);
+            const normalized = normalizeAudienceMap(parsed);
+            if (normalized) {
+                importedAudienceMap = normalized;
+            }
+        } catch (error) {
+            console.warn('Failed to load stored audience map.', error);
+        }
+    }
+
+    function registerAudienceMapMenu() {
+        if (typeof GM_registerMenuCommand !== 'function') {
+            return;
+        }
+
+        const importMapObject = (parsed) => {
+            const normalized = normalizeAudienceMap(parsed);
+            if (!normalized) {
+                alert('Invalid JSON. Expected an object: { "42624": "Path > To > Audience" }');
+                return false;
+            }
+
+            importedAudienceMap = normalized;
+            let persisted = false;
+            if (typeof GM_setValue === 'function') {
+                try {
+                    GM_setValue(MAP_STORAGE_KEY, JSON.stringify(normalized));
+                    persisted = true;
+                } catch (error) {
+                    console.warn('Audience map imported in memory, but could not be persisted to Tampermonkey storage.', error);
+                }
+            }
+
+            if (persisted) {
+                alert(`Imported ${Object.keys(normalized).length} audience mappings.\nSource is now Imported JSON (persisted).`);
+            } else {
+                alert(`Imported ${Object.keys(normalized).length} audience mappings.\nRunning from memory for this tab only (storage limit or save blocked).`);
+            }
+            return true;
+        };
+
+        GM_registerMenuCommand('Import Audience JSON (File)', () => {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json,application/json,text/plain';
+
+            fileInput.addEventListener('change', () => {
+                const selectedFile = fileInput.files && fileInput.files[0];
+                if (!selectedFile) {
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = () => {
+                    try {
+                        const text = String(reader.result || '');
+                        const parsed = JSON.parse(text);
+                        importMapObject(parsed);
+                    } catch (error) {
+                        alert('Could not parse JSON file. Please validate audiences-map.json format and try again.');
+                    }
+                };
+                reader.onerror = () => {
+                    alert('Could not read selected file. Please try again.');
+                };
+                reader.readAsText(selectedFile, 'utf-8');
+            }, { once: true });
+
+            fileInput.click();
+        });
+
+        GM_registerMenuCommand('Clear Imported Audience JSON', () => {
+            importedAudienceMap = null;
+            if (typeof GM_setValue === 'function') {
+                GM_setValue(MAP_STORAGE_KEY, '');
+            }
+            alert('Imported audience mappings cleared. Using inline AUDIENCE_MAP.');
+        });
+
+        GM_registerMenuCommand('Show Active Mapping Source', () => {
+            const map = getActiveAudienceMap();
+            const source = importedAudienceMap ? 'Imported JSON' : 'Inline AUDIENCE_MAP';
+            let persistedNote = '';
+            if (typeof GM_getValue === 'function') {
+                try {
+                    const stored = GM_getValue(MAP_STORAGE_KEY, '');
+                    persistedNote = stored ? '\nStored copy: yes' : '\nStored copy: no';
+                } catch (error) {
+                    persistedNote = '\nStored copy: unknown';
+                }
+            }
+            alert(`${source}\nEntries: ${Object.keys(map).length}${persistedNote}`);
+        });
+    }
+
+    loadStoredAudienceMap();
+    registerAudienceMapMenu();
 
     function setNativeInputValue(input, value) {
         const ownDescriptor = Object.getOwnPropertyDescriptor(input, 'value');
@@ -284,7 +418,7 @@
                 }
 
                 const code = lines[index];
-                const expectedPath = AUDIENCE_MAP[code];
+                const expectedPath = getActiveAudienceMap()[code];
 
                 if (!expectedPath) {
                     // Code not in map — add to not-found list immediately
@@ -319,10 +453,21 @@
                 searchInput.focus();
 
                 let resultAttempts = 0;
-                const resultMaxAttempts = 40;
+                const resultMaxAttempts = 20;
                 let noMatchRowCycles = 0;
 
                 const resultInterval = setInterval(() => {
+                    // Detect AG Grid "No Rows To Show" overlay immediately
+                    const noRowsOverlay = document.querySelector('.ag-overlay-no-rows-wrapper');
+                    if (noRowsOverlay) {
+                        clearInterval(resultInterval);
+                        const li = document.createElement("li");
+                        li.textContent = code;
+                        list.appendChild(li);
+                        setTimeout(() => processAudience(index + 1), 300);
+                        return;
+                    }
+
                     const resultRows = document.querySelectorAll('div.ag-row[role="row"]');
                     let included = false;
                     let foundDisabled = false;
@@ -375,18 +520,18 @@
                         const li = document.createElement("li");
                         li.textContent = code;
                         list.appendChild(li);
-                        setTimeout(() => processAudience(index + 1), 1000);
+                        setTimeout(() => processAudience(index + 1), 300);
                         return;
                     }
 
                     if (resultRows.length > 0 && !foundMatchingRow) {
                         noMatchRowCycles++;
-                        if (noMatchRowCycles >= 12) {
+                        if (noMatchRowCycles >= 8) {
                             clearInterval(resultInterval);
                             const li = document.createElement("li");
                             li.textContent = code;
                             list.appendChild(li);
-                            setTimeout(() => processAudience(index + 1), 1000);
+                            setTimeout(() => processAudience(index + 1), 300);
                             return;
                         }
                     } else {
@@ -400,9 +545,9 @@
                         const li = document.createElement("li");
                         li.textContent = foundMatchingRow ? `${code} (found row, include failed)` : `${code} (timeout)`;
                         list.appendChild(li);
-                        setTimeout(() => processAudience(index + 1), 1000);
+                        setTimeout(() => processAudience(index + 1), 300);
                     }
-                }, 500);
+                }, 300);
             }
 
             processAudience(0);
