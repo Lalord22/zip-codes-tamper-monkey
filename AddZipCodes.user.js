@@ -2,7 +2,7 @@
 // @name         Zip Code Entry UI
 // @author       Gerardo Salazar
 // @namespace    http://tampermonkey.net/
-// @version      3.16.26
+// @version      3.30.26
 // @description  Enter up to 100 zip codes
 // @match        *://*/*
 // @grant        none
@@ -10,6 +10,111 @@
 
 (function () {
     'use strict';
+
+    function setNativeInputValue(input, value) {
+        const ownDescriptor = Object.getOwnPropertyDescriptor(input, 'value');
+        const prototype = Object.getPrototypeOf(input);
+        const prototypeDescriptor = prototype
+            ? Object.getOwnPropertyDescriptor(prototype, 'value')
+            : null;
+
+        if (prototypeDescriptor && prototypeDescriptor.set) {
+            prototypeDescriptor.set.call(input, value);
+        } else if (ownDescriptor && ownDescriptor.set) {
+            ownDescriptor.set.call(input, value);
+        } else {
+            input.value = value;
+        }
+
+        try {
+            input.dispatchEvent(new InputEvent('input', {
+                bubbles: true,
+                data: value,
+                inputType: 'insertText'
+            }));
+        } catch (error) {
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function findRenderTarget() {
+        const searchInput = document.getElementById("geoTargetingSearchInputId");
+        if (searchInput && searchInput.offsetParent !== null) {
+            const sibling = searchInput.closest("div");
+            const parent = sibling ? sibling.parentElement : null;
+            if (parent && sibling) {
+                return { parent, sibling };
+            }
+        }
+
+        const flexParent = document.querySelector('div.sc-jDfIjF.xIVJD');
+        const inner = document.querySelector('div.sc-jhnTcL.cgMRHw');
+        if (flexParent && inner && inner.offsetParent !== null) {
+            return { parent: flexParent, sibling: inner };
+        }
+
+        return { parent: null, sibling: null };
+    }
+
+    function tryRenderUI() {
+        if (document.getElementById('zipCodeEntryUI')) {
+            return true;
+        }
+
+        const { parent, sibling } = findRenderTarget();
+        if (parent && sibling) {
+            renderUI(parent, sibling);
+            return true;
+        }
+
+        const searchInput = document.getElementById("geoTargetingSearchInputId");
+        if (searchInput && searchInput.offsetParent !== null) {
+            renderUI(null, null);
+            return true;
+        }
+
+        return false;
+    }
+
+    function watchForZipCodeUI() {
+        if (tryRenderUI()) {
+            return;
+        }
+
+        let attempts = 0;
+        const maxAttempts = 40;
+
+        const observer = new MutationObserver(() => {
+            if (tryRenderUI()) {
+                clearInterval(interval);
+                observer.disconnect();
+            }
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        const interval = setInterval(() => {
+            if (tryRenderUI()) {
+                clearInterval(interval);
+                observer.disconnect();
+                return;
+            }
+
+            attempts++;
+            if (attempts >= maxAttempts) {
+                clearInterval(interval);
+                observer.disconnect();
+                console.warn('Could not find inline location for Zip Code Entry UI. Rendering fixed fallback if possible.');
+
+                const searchInput = document.getElementById("geoTargetingSearchInputId");
+                if (searchInput && searchInput.offsetParent !== null) {
+                    renderUI(null, null);
+                }
+            }
+        }, 500);
+    }
 
     function renderUI(parent, sibling) {
         // Prevent duplicate UI
@@ -105,14 +210,7 @@
                 const searchInput = document.getElementById("geoTargetingSearchInputId");
                 if (searchInput) {
                     searchInput.focus();
-                    searchInput.value = "";
-                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-
-                    for (const char of code) {
-                        searchInput.setSelectionRange(searchInput.value.length, searchInput.value.length);
-                        document.execCommand('insertText', false, char);
-                        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
+                    setNativeInputValue(searchInput, code);
 
                     searchInput.blur();
                     searchInput.focus();
@@ -145,7 +243,7 @@
                             ) {
                                 const actionBtn = div.querySelector(
                                     `button.sc-storm-ui-20054995__sc-7di6d7-0.zUNWB, button.sc-storm-ui-20054379__sc-7di6d7-0.euxRVh, button.sc-storm-ui-20053392__sc-7di6d7-0.fiLRtv, button.sc-storm-ui-20057493__sc-7di6d7-0.jyaCfF,
-                                    button.sc-storm-ui-20058857__sc-7di6d7-0.jwjqAG, button.sc-storm-ui-20059048__sc-7di6d7-0.bAhUeF, button.sc-storm-ui-20059331__sc-7di6d7-0.wmAmY`
+                                    button.sc-storm-ui-20058857__sc-7di6d7-0.jwjqAG, button.sc-storm-ui-20059048__sc-7di6d7-0.bAhUeF, button.sc-storm-ui-20059331__sc-7di6d7-0.wmAmY, button.sc-storm-ui-20059654__sc-7di6d7-0.cFnbJy`
                                 );
                                 if (actionBtn) {
                                     if (actionBtn.disabled) {
@@ -227,34 +325,21 @@
         });
     }
 
-    // Wait for the "Change" button, then start looking for flexParent and inner
-    function waitForChangeButton() {
-        const changeBtn = document.getElementById("geoTargetingChangeButton_0");
+    document.addEventListener("click", (event) => {
+        const changeBtn = event.target.closest("#geoTargetingChangeButton_0");
         if (changeBtn) {
-            changeBtn.addEventListener("click", () => {
-                // Start looking for flexParent and inner after "Change" is clicked
-                let attempts = 0;
-                const maxAttempts = 40; // 20 seconds max (40 * 500ms)
-                const interval = setInterval(() => {
-                    const flexParent = document.querySelector('div.sc-jDfIjF.xIVJD');
-                    const inner = document.querySelector('div.sc-jhnTcL.cgMRHw');
-                    if (flexParent && inner && inner.offsetParent !== null) {
-                        clearInterval(interval);
-                        renderUI(flexParent, inner);
-                    }
-                    attempts++;
-                    if (attempts >= maxAttempts) {
-                        clearInterval(interval);
-                        console.warn('Could not find flexParent and inner div for Zip Code Entry UI.');
-                    }
-                }, 500);
-            });
-        } else {
-            // Try again in 500ms if button not found yet
-            setTimeout(waitForChangeButton, 500);
+            setTimeout(watchForZipCodeUI, 0);
         }
-    }
+    }, true);
 
-    waitForChangeButton();
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", () => {
+            if (document.getElementById("geoTargetingSearchInputId")) {
+                watchForZipCodeUI();
+            }
+        }, { once: true });
+    } else if (document.getElementById("geoTargetingSearchInputId")) {
+        watchForZipCodeUI();
+    }
 
 })();
